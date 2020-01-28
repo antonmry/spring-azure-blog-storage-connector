@@ -69,7 +69,10 @@ public class StorageService {
                 logInfo("%s container already exists.", containerName);
             }
         }
+
     }
+
+
 
     private static void logInfo(String log, Object... params) {
         System.out.println(String.format(log, params));

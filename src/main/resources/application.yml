@@ -1,0 +1,14 @@
+azure:
+  storage:
+    account-name: put-your-azure-storage-account-name-here
+    account-key: put-your-azure-storage-account-key-here
+    container-name: put-your-azure-storage-container-name-here
+    allow-telemetry: false
+    enable-https: true
+
+spring:
+  kafka:
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  profiles:
+    active: local
