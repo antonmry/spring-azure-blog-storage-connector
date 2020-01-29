@@ -27,21 +27,32 @@ ext {
 }
 
 dependencies {
+    // Azure
     implementation 'com.microsoft.azure:azure-storage-spring-boot-starter'
-    implementation 'org.springframework.kafka:spring-kafka'
+
+    // Kafka: https://docs.spring.io/spring-kafka/reference/html/#deps-for-24x
+    implementation 'org.springframework.kafka:spring-kafka:2.4.1.RELEASE'
+
+    implementation 'org.apache.kafka:kafka-clients:2.4.0'
+    testImplementation('org.springframework.kafka:spring-kafka-test:2.4.1.RELEASE') {
+        exclude module: 'kafka_2.11'
+    }
+    testImplementation 'org.apache.kafka:kafka-clients:2.4.0:test'
+    testImplementation 'org.apache.kafka:kafka_2.12:2.4.0'
+    testImplementation 'org.apache.kafka:kafka_2.12:2.4.0:test'
 
     // Dev
     compileOnly 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
     annotationProcessor 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 
     // Testing
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
-        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+        // exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
-    testCompile "org.testcontainers:junit-jupiter:1.12.5"
-    testCompile "org.testcontainers:kafka:1.12.5"
 }
 
 dependencyManagement {

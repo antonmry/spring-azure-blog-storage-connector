@@ -52,6 +52,7 @@ public class SpringAzureBlogStorageConnectorApplication implements CommandLineRu
         StorageService.createContainer(containerURL, properties.getContainerName());
         final BlockBlobURL blockBlobURL = containerURL.createBlockBlobURL(SOURCE_FILE);
 
+/*
         System.out.println("Enter a command:");
         System.out.println("(P)utBlob | (G)etBlob | (D)eleteBlobs | (E)xitSample");
         final BufferedReader reader =
@@ -85,6 +86,7 @@ public class SpringAzureBlogStorageConnectorApplication implements CommandLineRu
                     break;
             }
         }
+*/
     }
 
     @Bean

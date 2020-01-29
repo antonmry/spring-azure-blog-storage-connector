@@ -1,28 +1,52 @@
 package com.galiglobal.antonmry.springazureblogstorageconnector;
 
-import org.junit.Rule;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.test.context.EmbeddedKafka;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@EmbeddedKafka(topics = "topic1",
+        bootstrapServersProperty = "spring.kafka.bootstrap-servers")
 @SpringBootTest
-@Testcontainers
-class SpringAzureBlogStorageConnectorApplicationTests {
+@Slf4j
+public class SpringAzureBlogStorageConnectorApplicationTests {
 
-    @Container
-    public KafkaContainer kafkaContainer = new KafkaContainer();
+    @Autowired
+    private KafkaTemplate<String, String> template;
 
-    @Test
-    void shouldBeRunningKafka() {
-        assertTrue(kafkaContainer.isRunning());
+    final CountDownLatch latch = new CountDownLatch(4);
+
+    @KafkaListener(id = "foo", topics = "topic1")
+    public void listen1(String message) {
+        log.info("received: " + message);
+        latch.countDown();
     }
 
     @Test
-    void contextLoads() {
+    public void testKafka() throws Exception {
+
+        // Send
+        template.setDefaultTopic("topic1");
+        template.sendDefault("0", "foo");
+        template.sendDefault("2", "bar");
+        template.sendDefault("0", "baz");
+        template.sendDefault("2", "qux");
+        template.flush();
+        assertTrue(latch.await(60, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testAzureBlogStorage() throws Exception {
+
     }
 
 }
+
