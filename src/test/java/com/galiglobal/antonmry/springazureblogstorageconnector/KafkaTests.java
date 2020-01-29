@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         bootstrapServersProperty = "spring.kafka.bootstrap-servers")
 @SpringBootTest
 @Slf4j
-public class SpringAzureBlogStorageConnectorApplicationTests {
+public class KafkaTests {
 
     @Autowired
     private KafkaTemplate<String, String> template;
@@ -41,11 +41,6 @@ public class SpringAzureBlogStorageConnectorApplicationTests {
         template.sendDefault("2", "qux");
         template.flush();
         assertTrue(latch.await(60, TimeUnit.SECONDS));
-    }
-
-    @Test
-    public void testAzureBlogStorage() throws Exception {
-
     }
 
 }
