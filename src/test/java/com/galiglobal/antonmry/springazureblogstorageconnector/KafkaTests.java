@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @EmbeddedKafka(topics = {"topic1", "topic1.DLT"},
-        bootstrapServersProperty = "spring.kafka.bootstrap-servers")
+        bootstrapServersProperty = "spring.kafka.bootstrap-servers",
+        controlledShutdown = true)
 @SpringBootTest
 @Slf4j
 public class KafkaTests {
@@ -56,9 +57,6 @@ public class KafkaTests {
     public void listen(Foo2 foo) {
         log.info("Received: " + foo);
         latch.countDown();
-        if (foo.getFoo().startsWith("fail")) {
-            throw new RuntimeException("failed");
-        }
     }
 
     @KafkaListener(id = "dltGroup", topics = "topic1.DLT")
