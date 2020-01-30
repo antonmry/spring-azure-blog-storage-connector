@@ -12,3 +12,11 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
   profiles:
     active: local
+
+logging:
+  level:
+    org.springframework.kafka.*: OFF
+    org.springframework.kafka.listener.[KafkaMessageListenerContainer$ListenerConsumer]: OFF
+    org.apache.kafka.*: OFF
+    kafka.*: OFF
+    org.apache.zookeeper.*: OFF
