@@ -70,7 +70,6 @@ public class AzureBlobStorageTests {
                 .credential(credential)
                 .buildClient();
 
-
         BlobContainerClient blobContainerClient = storageClient
                 .getBlobContainerClient(containerName);
 
