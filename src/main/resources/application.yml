@@ -7,9 +7,14 @@ azure:
     enable-https: true
 
 spring:
-  kafka:
-    producer:
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  cloud:
+    stream:
+      bindings:
+        handle-out-0:
+          destination: testEmbeddedOut
+        handle-in-0:
+          destination: testEmbeddedIn
+          group: embeddedKafkaApplication
   profiles:
     active: local
 
