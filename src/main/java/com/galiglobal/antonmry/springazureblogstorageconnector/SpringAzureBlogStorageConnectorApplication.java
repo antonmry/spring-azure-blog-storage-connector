@@ -13,9 +13,4 @@ public class SpringAzureBlogStorageConnectorApplication {
     public static void main(String[] args) {
         SpringApplication.run(SpringAzureBlogStorageConnectorApplication.class);
     }
-
-    @Bean
-    public Function<byte[], byte[]> handle() {
-        return in -> new String(in).toUpperCase().getBytes();
-    }
 }
