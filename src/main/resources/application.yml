@@ -6,9 +6,30 @@ azure:
     allow-telemetry: false
     enable-https: true
 
+spring.cloud.stream.kafka.binder.producerProperties:
+  allow.auto.create.topics: false
+  key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+  value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+
+spring.cloud.stream.kafka.binder.consumerProperties:
+  allow.auto.create.topics: false
+  key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+  value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+
 spring:
   cloud:
     stream:
+      kafka:
+        binder:
+          consumer-properties:
+            group.id: server1
+            auto.offset.reset: earliest
+            key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+            value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+          producer-properties:
+            allow.auto.create.topics: false
+            key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+            value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
       bindings:
         handle-out-0:
           destination: testEmbeddedOut
