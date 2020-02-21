@@ -7,12 +7,9 @@ azure:
     enable-https: true
 
 
-connector:
-  azure:
-    blob:
-      kafka:
-        group-id: kafka-group-id-of-the-uploader
-        topics: list-of-topics-to-upload-to-blob-storage
+connector.azure.blob.kafka:
+  group-id: kafka-group-id-of-the-uploader
+  topics: list-of-topics-to-upload-to-blob-storage
 
 spring.cloud.stream.kafka.binder.producerProperties:
   allow.auto.create.topics: false
@@ -25,25 +22,6 @@ spring.cloud.stream.kafka.binder.consumerProperties:
   value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
 
 spring:
-  cloud:
-    stream:
-      kafka:
-        binder:
-          consumer-properties:
-            group.id: server1
-            auto.offset.reset: earliest
-            key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
-            value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
-          producer-properties:
-            allow.auto.create.topics: false
-            key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
-            value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
-      bindings:
-        handle-out-0:
-          destination: testEmbeddedOut
-        handle-in-0:
-          destination: testEmbeddedIn
-          group: embeddedKafkaApplication
   profiles:
     active: local
 
