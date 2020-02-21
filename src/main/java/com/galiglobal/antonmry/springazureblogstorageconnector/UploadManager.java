@@ -6,11 +6,14 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.KafkaListenerContainerFactory;
+import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
@@ -64,19 +67,35 @@ public class UploadManager {
         return outStream.toByteArray();
     }
 
-    @KafkaListener(topics = "#{@uploadManagerConfiguration.getTopics()}", groupId = "#{@uploadManagerConfiguration.getGroupId()}")
-    public void listen(ConsumerRecord<?, ?> record) throws Exception {
+    @Bean
+    public KafkaListenerContainerFactory<?> batchFactory(ConsumerFactory<Object, Object> kafkaConsumerFactory) {
+        ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(kafkaConsumerFactory);
+        factory.setBatchListener(true);
+        return factory;
+    }
 
-        String filename;
-        if (record.key() instanceof String) {
-            filename = (String) record.key();
-        } else if (record.key() instanceof byte[]) {
-            filename = new String((byte[]) record.key());
-        } else
-            // TODO: generante UUID?
-            filename = "random.txt";
+    // TODO: add transactions support https://docs.spring.io/spring-kafka/reference/html/#transactions-batch
+    // TODO: test more than one topic
+    @KafkaListener(topics = "#{@uploadManagerConfiguration.getTopics()}",
+            groupId = "#{@uploadManagerConfiguration.getGroupId()}",
+            containerFactory = "batchFactory")
+    public void listen(ConsumerRecords<?, ?> records) throws Exception {
 
-        upload(filename, (byte[]) record.value());
+        for (ConsumerRecord<?, ?> record : records) {
+            String filename;
+            if (record.key() instanceof String) {
+                filename = (String) record.key();
+            } else if (record.key() instanceof byte[]) {
+                filename = new String((byte[]) record.key());
+            } else
+                // TODO: generante UUID?
+                filename = "random.txt";
+
+            upload(filename, (byte[]) record.value());
+
+        }
     }
 
 

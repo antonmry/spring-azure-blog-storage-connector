@@ -25,10 +25,12 @@ public class KafkaTests {
     public void testSendReceive() throws IOException, InterruptedException {
         KafkaHelper kafkaManager = new KafkaHelper();
         kafkaManager.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
+        kafkaManager.produce(TOPIC, "foo2.txt".getBytes(), "foo2".getBytes());
 
         Thread.sleep(2000);
 
-        assertThat(new String(azure.download("foo.txt"))).isEqualToIgnoringCase("FOO");
+        assertThat(new String(azure.download("foo.txt"))).isEqualTo("foo");
+        assertThat(new String(azure.download("foo2.txt"))).isEqualTo("foo2");
 
         //TODO: we should delete the file
     }
