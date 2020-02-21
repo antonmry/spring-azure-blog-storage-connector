@@ -6,6 +6,14 @@ azure:
     allow-telemetry: false
     enable-https: true
 
+
+connector:
+  azure:
+    blob:
+      kafka:
+        group-id: kafka-group-id-of-the-uploader
+        topics: list-of-topics-to-upload-to-blob-storage
+
 spring.cloud.stream.kafka.binder.producerProperties:
   allow.auto.create.topics: false
   key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer

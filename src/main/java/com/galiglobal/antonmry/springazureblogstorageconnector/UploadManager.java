@@ -6,7 +6,10 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +20,15 @@ import java.io.InputStream;
 import java.util.Locale;
 
 @Component
+// TODO: set dependencies
+//@DependsOn({"UploadManagerConfiguration"})
+//@ConditionalOnProperty(prefix = "connector.azure.blob.kafka", name = "groupId")
 public class UploadManager {
 
     private BlobContainerClient blobContainerClient;
+
+    @Autowired
+    private UploadManagerConfiguration uploadManagerConfiguration;
 
     public UploadManager(@Value("${azure.storage.account-name}") String accountName,
                          @Value("${azure.storage.account-key}") String accountKey,
@@ -55,8 +64,7 @@ public class UploadManager {
         return outStream.toByteArray();
     }
 
-    // TODO: make topics and groupID a configuration property
-    @KafkaListener(topics = "testEmbeddedOut", groupId = "test")
+    @KafkaListener(topics = "#{@uploadManagerConfiguration.getTopics()}", groupId = "#{@uploadManagerConfiguration.getGroupId()}")
     public void listen(ConsumerRecord<?, ?> record) throws Exception {
 
         String filename;
