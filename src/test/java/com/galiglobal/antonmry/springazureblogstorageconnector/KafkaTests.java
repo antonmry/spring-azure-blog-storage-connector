@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,7 +33,7 @@ public class KafkaTests {
         assertThat(new String(azure.download("foo.txt"))).isEqualTo("foo");
         assertThat(new String(azure.download("foo2.txt"))).isEqualTo("foo2");
 
-        //TODO: we should delete the file
+        azure.deleteBatch(Arrays.asList("foo.txt", "foo2.txt"));
     }
 }
 

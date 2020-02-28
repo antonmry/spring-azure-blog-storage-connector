@@ -70,10 +70,11 @@
         </dependency>
 
         <!-- Azure -->
+
         <dependency>
             <groupId>com.azure</groupId>
-            <artifactId>azure-storage-blob</artifactId>
-            <version>12.2.0</version>
+            <artifactId>azure-storage-blob-batch</artifactId>
+            <version>12.3.1</version>
         </dependency>
 
         <!-- Dev -->
