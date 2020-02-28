@@ -98,7 +98,6 @@ public class UploadManager {
     }
 
     // TODO: add transactions support https://docs.spring.io/spring-kafka/reference/html/#transactions-batch
-    // TODO: test more than one topic
     @KafkaListener(topics = "#{@uploadManagerConfiguration.getTopics()}",
             groupId = "#{@uploadManagerConfiguration.getGroupId()}",
             containerFactory = "batchFactory")

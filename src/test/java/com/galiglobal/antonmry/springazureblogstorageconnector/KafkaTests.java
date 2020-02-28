@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class KafkaTests {
 
     private static final String TOPIC = "testEmbeddedOut";
+    private static final String TOPIC2 = "testEmbeddedOut2";
 
     @Autowired
     private UploadManager azure;
@@ -26,7 +27,7 @@ public class KafkaTests {
     public void testSendReceive() throws IOException, InterruptedException {
         KafkaHelper kafkaManager = new KafkaHelper();
         kafkaManager.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
-        kafkaManager.produce(TOPIC, "foo2.txt".getBytes(), "foo2".getBytes());
+        kafkaManager.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());
 
         Thread.sleep(2000);
 

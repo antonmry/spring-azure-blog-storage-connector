@@ -12,6 +12,7 @@ Create the topic for testing:
 
 ```
 kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic testEmbeddedOut
+kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic testEmbeddedOut2
 kafka-topics --list --bootstrap-server localhost:9092
 ```
 
