@@ -25,16 +25,21 @@ public class KafkaTests {
 
     @Test
     public void testSendReceive() throws IOException, InterruptedException {
-        KafkaHelper kafkaManager = new KafkaHelper();
-        kafkaManager.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
-        kafkaManager.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());
 
-        Thread.sleep(2000);
+        try {
+            KafkaHelper kafkaManager = new KafkaHelper();
+            kafkaManager.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
+            kafkaManager.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());
 
-        assertThat(new String(azure.download("foo.txt"))).isEqualTo("foo");
-        assertThat(new String(azure.download("foo2.txt"))).isEqualTo("foo2");
+            // Make stronger this test
+            Thread.sleep(5000);
 
-        azure.deleteBatch(Arrays.asList("foo.txt", "foo2.txt"));
+            assertThat(new String(azure.download("foo.txt"))).isEqualTo("foo");
+            assertThat(new String(azure.download("foo2.txt"))).isEqualTo("foo2");
+
+        } finally {
+            azure.deleteBatch(Arrays.asList("foo.txt", "foo2.txt"));
+        }
     }
 }
 

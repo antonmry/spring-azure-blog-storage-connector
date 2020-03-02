@@ -4,6 +4,7 @@ import com.azure.storage.blob.*;
 import com.azure.storage.blob.batch.BlobBatch;
 import com.azure.storage.blob.batch.BlobBatchClient;
 import com.azure.storage.blob.batch.BlobBatchClientBuilder;
+import com.azure.storage.blob.models.BlockBlobItem;
 import com.azure.storage.blob.models.ParallelTransferOptions;
 import com.azure.storage.blob.specialized.BlockBlobAsyncClient;
 import com.azure.storage.blob.specialized.BlockBlobClient;
@@ -18,6 +19,7 @@ import org.springframework.kafka.config.KafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -121,45 +123,23 @@ public class UploadManager {
     public void listen(ConsumerRecords<?, ?> records) throws Exception {
 
         Flux.fromIterable(records)
-                .log("ConsumerRecords")
-                .map(v -> {
-                    System.out.println("Hello");
-                    return "hello";
-                })
-/*
-                .map(v -> blobContainerAsyncClient.getBlobAsyncClient((String) v.key())
+                .flatMap(v -> blobContainerAsyncClient.getBlobAsyncClient(calculateFilename(v.key()))
                         .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
-                        .log("Upload")
                         .doOnError((e) -> {
-                            System.out.println("Error: " + e);
+                            // TODO: manage java.lang.IllegalArgumentException: Blob already exists. Specify overwrite to true to force update the blob.
+                            System.out.println("Error uploading file: " + e);
                         })
-                        .doOnSuccess((b) -> System.out.println("Uploaded with ETag: " + b.getETag()))
-                        .subscribe())
-*/
+                        .doOnSuccess((b) -> System.out.println("Uploaded file with ETag: " + b.getETag())))
                 .subscribe();
+    }
 
-/*
-        String filename;
-
-        for (ConsumerRecord<?, ?> record : records) {
-
-
-            if (record.key() instanceof String) {
-                filename = (String) record.key();
-            } else if (record.key() instanceof byte[]) {
-                filename = new String((byte[]) record.key());
-            } else
-                // TODO: generante UUID?
-                filename = "random.txt";
-
-            blobContainerAsyncClient.getBlobAsyncClient(filename)
-                    .upload(Flux.just(ByteBuffer.wrap((byte[]) record.value())), options)
-                    .doOnError((e) -> {
-                        System.out.println("Error: " + e);
-                    })
-                    .doOnSuccess((b) -> System.out.println("Uploaded with ETag: " + b.getETag()))
-                    .subscribe();
-*/
-
+    String calculateFilename(Object filename) {
+        if (filename instanceof String) {
+            return (String) filename;
+        } else if (filename instanceof byte[]) {
+            return new String((byte[]) filename);
+        } else
+            // TODO: generante UUID?
+            return "random.txt";
     }
 }
