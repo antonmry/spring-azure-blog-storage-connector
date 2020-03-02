@@ -4,12 +4,9 @@ import com.azure.storage.blob.*;
 import com.azure.storage.blob.batch.BlobBatch;
 import com.azure.storage.blob.batch.BlobBatchClient;
 import com.azure.storage.blob.batch.BlobBatchClientBuilder;
-import com.azure.storage.blob.models.BlockBlobItem;
 import com.azure.storage.blob.models.ParallelTransferOptions;
-import com.azure.storage.blob.specialized.BlockBlobAsyncClient;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,13 +16,14 @@ import org.springframework.kafka.config.KafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import reactor.retry.Retry;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 
@@ -34,17 +32,34 @@ import java.util.Locale;
 //@ConditionalOnProperty(prefix = "connector.azure.blob.kafka", name = "groupId")
 public class UploadManager {
 
+    @Value("${azure.storage.retries:0}")
+    private int retries;
+
+    @Value("${azure.storage.first-backoff:100}")
+    private int firstBackoff;
+
+    @Value("${azure.storage.max-backoff:1000}")
+    private int maxBackoff;
+
+    @Value("${azure.storage.container-name}")
+    private String containerName;
+
+    @Value("${azure.storage.block-size:1024}")
+    private Integer blockSize;
+
+    @Value("${azure.storage.num-buffers:2}")
+    private Integer numBuffers;
+
+    @Value("${azure.storage.max-single-upload-size:268435456}")
+    private Integer maxSingleUploadSize;
+
     // TODO: separate Azure methods used only for testing for a separated class
     public static final String AZURE_BLOB_URL = "https://%s.blob.core.windows.net";
     private BlobContainerClient blobContainerClient;
 
-    private final ParallelTransferOptions options = new ParallelTransferOptions(1096, 4,
-            (progress) -> System.out.printf("Progress: %s%n", progress),
-            BlockBlobAsyncClient.MAX_UPLOAD_BLOB_BYTES);
-
-
-    @Value("${azure.storage.container-name}")
-    private String containerName;
+    // TODO: move options to config
+    private final ParallelTransferOptions options = new ParallelTransferOptions(blockSize, numBuffers,
+            (progress) -> System.out.printf("Progress: %s%n", progress), maxSingleUploadSize);
 
     private final BlobServiceClient blockingClient;
     private final BlobBatchClient blobBatchClient;
@@ -120,15 +135,23 @@ public class UploadManager {
     @KafkaListener(topics = "#{@uploadManagerConfiguration.getTopics()}",
             groupId = "#{@uploadManagerConfiguration.getGroupId()}",
             containerFactory = "batchFactory")
-    public void listen(ConsumerRecords<?, ?> records) throws Exception {
+    public void listen(ConsumerRecords<?, ?> records) {
 
         Flux.fromIterable(records)
                 .flatMap(v -> blobContainerAsyncClient.getBlobAsyncClient(calculateFilename(v.key()))
                         .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
-                        .doOnError((e) -> {
-                            // TODO: manage java.lang.IllegalArgumentException: Blob already exists. Specify overwrite to true to force update the blob.
-                            System.out.println("Error uploading file: " + e);
-                        })
+                        .log("Before re-try")
+                        .retryWhen(
+                                // Usually because blob already exists so it doesn't retry
+                                Retry.onlyIf(rc -> !(rc.exception() instanceof IllegalArgumentException))
+                                        // TODO: move to config
+                                        .retryMax(retries)
+                                        .exponentialBackoff(Duration.ofMillis(firstBackoff), Duration.ofMillis(maxBackoff))
+                        )
+                        .log("After re-try")
+                        // TODO: break transaction? move to DLQ?
+                        .doOnError((e) -> System.out.println("Error uploading file: " + e))
+                        // TODO: generate JMX metric
                         .doOnSuccess((b) -> System.out.println("Uploaded file with ETag: " + b.getETag())))
                 .subscribe();
     }
@@ -139,7 +162,7 @@ public class UploadManager {
         } else if (filename instanceof byte[]) {
             return new String((byte[]) filename);
         } else
-            // TODO: generante UUID?
+            // TODO: generate UUID?
             return "random.txt";
     }
 }
