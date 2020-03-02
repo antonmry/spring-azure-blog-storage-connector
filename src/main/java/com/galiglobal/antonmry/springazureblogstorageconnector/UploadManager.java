@@ -1,11 +1,11 @@
 package com.galiglobal.antonmry.springazureblogstorageconnector;
 
-import com.azure.storage.blob.BlobContainerClient;
-import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.blob.*;
 import com.azure.storage.blob.batch.BlobBatch;
 import com.azure.storage.blob.batch.BlobBatchClient;
 import com.azure.storage.blob.batch.BlobBatchClientBuilder;
+import com.azure.storage.blob.models.ParallelTransferOptions;
+import com.azure.storage.blob.specialized.BlockBlobAsyncClient;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -17,11 +17,13 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.KafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
 
@@ -34,11 +36,18 @@ public class UploadManager {
     public static final String AZURE_BLOB_URL = "https://%s.blob.core.windows.net";
     private BlobContainerClient blobContainerClient;
 
+    private final ParallelTransferOptions options = new ParallelTransferOptions(1096, 4,
+            (progress) -> System.out.printf("Progress: %s%n", progress),
+            BlockBlobAsyncClient.MAX_UPLOAD_BLOB_BYTES);
+
+
     @Value("${azure.storage.container-name}")
     private String containerName;
 
-    private final BlobServiceClient storageClient;
+    private final BlobServiceClient blockingClient;
     private final BlobBatchClient blobBatchClient;
+    private final BlobServiceAsyncClient asyncClient;
+    private BlobContainerAsyncClient blobContainerAsyncClient;
 
     public UploadManager(@Value("${azure.storage.account-name}") String accountName,
                          @Value("${azure.storage.account-key}") String accountKey,
@@ -47,13 +56,21 @@ public class UploadManager {
         StorageSharedKeyCredential credential = new StorageSharedKeyCredential(accountName, accountKey);
         String endpoint = String.format(Locale.ROOT, AZURE_BLOB_URL, accountName);
 
-        storageClient = new BlobServiceClientBuilder()
+        blockingClient = new BlobServiceClientBuilder()
                 .endpoint(endpoint)
                 .credential(credential)
                 .buildClient();
 
-        blobContainerClient = storageClient.getBlobContainerClient(containerName);
-        blobBatchClient = new BlobBatchClientBuilder(storageClient).buildClient();
+        blobContainerClient = blockingClient.getBlobContainerClient(containerName);
+        blobBatchClient = new BlobBatchClientBuilder(blockingClient).buildClient();
+
+
+        asyncClient = new BlobServiceClientBuilder()
+                .endpoint(endpoint)
+                .credential(credential)
+                .buildAsyncClient();
+
+        blobContainerAsyncClient = asyncClient.getBlobContainerAsyncClient(containerName);
 
     }
 
@@ -103,9 +120,29 @@ public class UploadManager {
             containerFactory = "batchFactory")
     public void listen(ConsumerRecords<?, ?> records) throws Exception {
 
+        Flux.fromIterable(records)
+                .log("ConsumerRecords")
+                .map(v -> {
+                    System.out.println("Hello");
+                    return "hello";
+                })
+/*
+                .map(v -> blobContainerAsyncClient.getBlobAsyncClient((String) v.key())
+                        .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
+                        .log("Upload")
+                        .doOnError((e) -> {
+                            System.out.println("Error: " + e);
+                        })
+                        .doOnSuccess((b) -> System.out.println("Uploaded with ETag: " + b.getETag()))
+                        .subscribe())
+*/
+                .subscribe();
+
+/*
         String filename;
 
         for (ConsumerRecord<?, ?> record : records) {
+
 
             if (record.key() instanceof String) {
                 filename = (String) record.key();
@@ -115,10 +152,14 @@ public class UploadManager {
                 // TODO: generante UUID?
                 filename = "random.txt";
 
-            upload(filename, (byte[]) record.value());
+            blobContainerAsyncClient.getBlobAsyncClient(filename)
+                    .upload(Flux.just(ByteBuffer.wrap((byte[]) record.value())), options)
+                    .doOnError((e) -> {
+                        System.out.println("Error: " + e);
+                    })
+                    .doOnSuccess((b) -> System.out.println("Uploaded with ETag: " + b.getETag()))
+                    .subscribe();
+*/
 
-        }
     }
-
-
 }
