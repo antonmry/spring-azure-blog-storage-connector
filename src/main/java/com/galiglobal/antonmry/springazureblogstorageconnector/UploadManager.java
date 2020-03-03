@@ -18,6 +18,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.retry.Retry;
 
 import java.nio.ByteBuffer;
@@ -37,6 +38,9 @@ public class UploadManager {
 
     @Value("${azure.storage.retries:1}")
     private int retries;
+
+    @Value("${azure.storage.timeout:10000}")
+    private int timeout;
 
     @Value("${azure.storage.first-backoff:100}")
     private int firstBackoff;
@@ -98,6 +102,7 @@ public class UploadManager {
         Flux.fromIterable(records)
                 .flatMap(v -> blobContainerAsyncClient.getBlobAsyncClient(calculateFilename(v.key()))
                         .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
+                        .timeout(Mono.delay(Duration.ofMillis(timeout)))
                         .retryWhen(
                                 // Usually because blob already exists so it doesn't retry
                                 Retry.onlyIf(rc -> {

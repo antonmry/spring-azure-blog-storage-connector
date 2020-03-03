@@ -25,6 +25,8 @@ public class UploadManagerConfiguration {
 
     private String dlqTopic;
 
+    private Integer timeout;
+
     private Integer retries;
 
     private Integer firstBackoff;
