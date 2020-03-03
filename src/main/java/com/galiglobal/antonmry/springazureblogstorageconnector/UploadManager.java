@@ -1,11 +1,9 @@
 package com.galiglobal.antonmry.springazureblogstorageconnector;
 
-import com.azure.storage.blob.*;
-import com.azure.storage.blob.batch.BlobBatch;
-import com.azure.storage.blob.batch.BlobBatchClient;
-import com.azure.storage.blob.batch.BlobBatchClientBuilder;
+import com.azure.storage.blob.BlobContainerAsyncClient;
+import com.azure.storage.blob.BlobServiceAsyncClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.ParallelTransferOptions;
-import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,13 +16,8 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.retry.Retry;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.List;
 import java.util.Locale;
 
 @Component
@@ -41,9 +34,6 @@ public class UploadManager {
     @Value("${azure.storage.max-backoff:1000}")
     private int maxBackoff;
 
-    @Value("${azure.storage.container-name}")
-    private String containerName;
-
     @Value("${azure.storage.block-size:1024}")
     private Integer blockSize;
 
@@ -53,16 +43,11 @@ public class UploadManager {
     @Value("${azure.storage.max-single-upload-size:268435456}")
     private Integer maxSingleUploadSize;
 
-    // TODO: separate Azure methods used only for testing for a separated class
     public static final String AZURE_BLOB_URL = "https://%s.blob.core.windows.net";
-    private BlobContainerClient blobContainerClient;
 
-    // TODO: move options to config
     private final ParallelTransferOptions options = new ParallelTransferOptions(blockSize, numBuffers,
             (progress) -> System.out.printf("Progress: %s%n", progress), maxSingleUploadSize);
 
-    private final BlobServiceClient blockingClient;
-    private final BlobBatchClient blobBatchClient;
     private final BlobServiceAsyncClient asyncClient;
     private BlobContainerAsyncClient blobContainerAsyncClient;
 
@@ -73,54 +58,14 @@ public class UploadManager {
         StorageSharedKeyCredential credential = new StorageSharedKeyCredential(accountName, accountKey);
         String endpoint = String.format(Locale.ROOT, AZURE_BLOB_URL, accountName);
 
-        blockingClient = new BlobServiceClientBuilder()
-                .endpoint(endpoint)
-                .credential(credential)
-                .buildClient();
-
-        blobContainerClient = blockingClient.getBlobContainerClient(containerName);
-        blobBatchClient = new BlobBatchClientBuilder(blockingClient).buildClient();
-
-
         asyncClient = new BlobServiceClientBuilder()
                 .endpoint(endpoint)
                 .credential(credential)
                 .buildAsyncClient();
 
         blobContainerAsyncClient = asyncClient.getBlobContainerAsyncClient(containerName);
-
     }
 
-    public void upload(String filename, byte[] data) throws IOException {
-
-        BlockBlobClient blobClient = blobContainerClient.getBlobClient(filename).getBlockBlobClient();
-        InputStream dataStream = new ByteArrayInputStream(data);
-        blobClient.upload(dataStream, data.length, true);
-        dataStream.close();
-    }
-
-    public void deleteBatch(List<String> filenames) {
-
-        BlobBatch blobBatch = blobBatchClient.getBlobBatch();
-
-        for (String filename : filenames) {
-            blobBatch.deleteBlob(containerName, filename);
-        }
-
-        // Note: we aren't reviewing here if requests fail. Use only for testing
-        blobBatchClient.submitBatch(blobBatch);
-
-    }
-
-    public byte[] download(String filename) throws IOException {
-
-        BlockBlobClient blobClient = blobContainerClient.getBlobClient(filename).getBlockBlobClient();
-        int dataSize = (int) blobClient.getProperties().getBlobSize();
-        ByteArrayOutputStream outStream = new ByteArrayOutputStream(dataSize);
-        blobClient.download(outStream);
-        outStream.close();
-        return outStream.toByteArray();
-    }
 
     @Bean
     public KafkaListenerContainerFactory<?> batchFactory(ConsumerFactory<Object, Object> kafkaConsumerFactory) {
@@ -137,18 +82,16 @@ public class UploadManager {
             containerFactory = "batchFactory")
     public void listen(ConsumerRecords<?, ?> records) {
 
+        // TODO: add timeout for each upload
         Flux.fromIterable(records)
                 .flatMap(v -> blobContainerAsyncClient.getBlobAsyncClient(calculateFilename(v.key()))
                         .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
-                        .log("Before re-try")
                         .retryWhen(
                                 // Usually because blob already exists so it doesn't retry
                                 Retry.onlyIf(rc -> !(rc.exception() instanceof IllegalArgumentException))
-                                        // TODO: move to config
                                         .retryMax(retries)
                                         .exponentialBackoff(Duration.ofMillis(firstBackoff), Duration.ofMillis(maxBackoff))
                         )
-                        .log("After re-try")
                         // TODO: break transaction? move to DLQ?
                         .doOnError((e) -> System.out.println("Error uploading file: " + e))
                         // TODO: generate JMX metric

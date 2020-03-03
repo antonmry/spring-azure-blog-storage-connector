@@ -3,10 +3,12 @@ package com.galiglobal.antonmry.springazureblogstorageconnector;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@Component
 public class KafkaHelper {
 
     private static Map<String, Object> producerProps;

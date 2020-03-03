@@ -21,15 +21,17 @@ public class KafkaTests {
     private static final String TOPIC2 = "testEmbeddedOut2";
 
     @Autowired
-    private UploadManager azure;
+    private AzureHelper azure;
+
+    @Autowired
+    private KafkaHelper kafka;
 
     @Test
     public void testSendReceive() throws IOException, InterruptedException {
 
         try {
-            KafkaHelper kafkaManager = new KafkaHelper();
-            kafkaManager.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
-            kafkaManager.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());
+            kafka.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
+            kafka.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());
 
             // Make stronger this test
             Thread.sleep(5000);
