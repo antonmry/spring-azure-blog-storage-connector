@@ -23,13 +23,16 @@ public class KafkaTests {
     @Autowired
     private AzureHelper azure;
 
-    @Autowired
-    private KafkaHelper kafka;
+    private KafkaHelper kafka = new KafkaHelper();
 
     @Test
     public void testSendReceive() throws IOException, InterruptedException {
 
         try {
+/*
+            kafka.produce(TOPIC, null, "foo".getBytes());
+*/
+            kafka.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
             kafka.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
             kafka.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());
 

@@ -6,15 +6,15 @@ azure:
     allow-telemetry: false
     enable-https: true
 
-
 connector.azure.blob.kafka:
   group-id: kafka-group-id-of-the-uploader
   topics: list-of-topics-to-upload-to-blob-storage
+  dlq-topic: kafka-topic-for-errors
 
-spring.cloud.stream.kafka.binder.producerProperties:
-  allow.auto.create.topics: false
-  key.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
-  value.deserializer: org.apache.kafka.common.serialization.ByteDeserializer
+#spring.cloud.stream.kafka.binder.producerProperties:
+#  allow.auto.create.topics: false
+#  key-serializer: org.apache.kafka.common.serialization.ByteSerializer
+#  value-serializer: org.apache.kafka.common.serialization.ByteSerializer
 
 spring.cloud.stream.kafka.binder.consumerProperties:
   allow.auto.create.topics: false
@@ -25,10 +25,3 @@ spring:
   profiles:
     active: local
 
-logging:
-  level:
-    org.springframework.kafka.*: OFF
-    org.springframework.kafka.listener.[KafkaMessageListenerContainer$ListenerConsumer]: OFF
-    org.apache.kafka.*: OFF
-    kafka.*: OFF
-    org.apache.zookeeper.*: OFF

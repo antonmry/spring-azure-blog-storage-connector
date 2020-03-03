@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 
-@Component
 public class KafkaHelper {
 
     private static Map<String, Object> producerProps;
@@ -20,10 +19,9 @@ public class KafkaHelper {
         producerProps.put("value.serializer", ByteArraySerializer.class);
     }
 
-    public void produce(String topic, byte[] key, byte[] value) {
-
-        DefaultKafkaProducerFactory<byte[], byte[]> kafkaProducerFactory = new DefaultKafkaProducerFactory<>(producerProps);
-        KafkaTemplate<byte[], byte[]> template = new KafkaTemplate<>(kafkaProducerFactory, true);
+    public void produce(String topic, Object key, Object value) {
+        DefaultKafkaProducerFactory<Object, Object> kafkaProducerFactory = new DefaultKafkaProducerFactory<>(producerProps);
+        KafkaTemplate<Object, Object> template = new KafkaTemplate<>(kafkaProducerFactory, true);
         template.send(topic, key, value);
     }
 

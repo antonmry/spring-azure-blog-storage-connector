@@ -8,6 +8,8 @@ import org.springframework.validation.annotation.Validated;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+import java.util.HashMap;
+import java.util.Map;
 
 @Data
 @Validated
@@ -20,6 +22,8 @@ public class UploadManagerConfiguration {
 
     @NotEmpty
     private String groupId;
+
+    private String dlqTopic;
 
     private Integer retries;
 
