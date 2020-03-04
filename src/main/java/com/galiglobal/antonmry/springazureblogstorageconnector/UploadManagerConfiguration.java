@@ -1,6 +1,7 @@
 package com.galiglobal.antonmry.springazureblogstorageconnector;
 
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -28,6 +29,10 @@ public class UploadManagerConfiguration {
     private Integer timeout;
 
     private Integer retries;
+
+    private Integer maxRequestCount;
+
+    private Integer maxRequestsWindowTime;
 
     private Integer firstBackoff;
 

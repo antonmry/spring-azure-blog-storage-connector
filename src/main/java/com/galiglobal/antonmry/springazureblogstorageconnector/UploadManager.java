@@ -8,7 +8,6 @@ import com.azure.storage.common.StorageSharedKeyCredential;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -26,6 +25,7 @@ import java.time.Duration;
 import java.util.Locale;
 
 @Component
+// TODO: generate JMX metric
 // TODO: set dependencies
 //@ConditionalOnProperty(prefix = "connector.azure.blob.kafka", name = "groupId")
 @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
@@ -57,6 +57,12 @@ public class UploadManager {
     @Value("${azure.storage.max-single-upload-size:268435456}")
     private Integer maxSingleUploadSize;
 
+    @Value("${azure.storage.max-requests-count:1}")
+    private int maxRequestCount;
+
+    @Value("${azure.storage.max-requests-window-time:100}")
+    private int maxRequestsWindowTime;
+
     public static final String AZURE_BLOB_URL = "https://%s.blob.core.windows.net";
 
     private final ParallelTransferOptions options = new ParallelTransferOptions(blockSize, numBuffers,
@@ -65,9 +71,12 @@ public class UploadManager {
 
     private BlobContainerAsyncClient blobContainerAsyncClient;
 
+    private final KafkaTemplate<Object, Object> kafkaTemplate;
+
     public UploadManager(@Value("${azure.storage.account-name}") String accountName,
                          @Value("${azure.storage.account-key}") String accountKey,
-                         @Value("${azure.storage.container-name}") String containerName) {
+                         @Value("${azure.storage.container-name}") String containerName,
+                         KafkaTemplate<Object, Object> kafkaTemplate) {
 
         StorageSharedKeyCredential credential = new StorageSharedKeyCredential(accountName, accountKey);
         String endpoint = String.format(Locale.ROOT, AZURE_BLOB_URL, accountName);
@@ -78,6 +87,7 @@ public class UploadManager {
                 .buildAsyncClient();
 
         blobContainerAsyncClient = asyncClient.getBlobContainerAsyncClient(containerName);
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Bean
@@ -89,62 +99,70 @@ public class UploadManager {
         return factory;
     }
 
-    @Autowired
-    private KafkaTemplate<Object, Object> kafkaTemplate;
-
     @KafkaListener(topics = "#{@uploadManagerConfiguration.getTopics()}",
             groupId = "#{@uploadManagerConfiguration.getGroupId()}",
             containerFactory = "batchFactory")
-    public void listen(ConsumerRecords<?, ?> records) throws Exception {
+    public void listen(ConsumerRecords<?, ?> records) {
 
-        // TODO: add timeout for each upload
-        // TODO: add rate
         Flux.fromIterable(records)
-                .flatMap(v -> blobContainerAsyncClient.getBlobAsyncClient(calculateFilename(v.key()))
-                        .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
-                        .timeout(Mono.delay(Duration.ofMillis(timeout)))
-                        .retryWhen(
-                                // Usually because blob already exists so it doesn't retry
-                                Retry.onlyIf(rc -> {
-                                    if (rc.exception().getMessage().contains("lob already exists")) {
-                                        log.debug("Duplicated file, ignoring retry " + calculateFilename(v.key()));
-                                        return false;
-                                    } else {
-                                        log.warn("Retrying upload " + calculateFilename(v.key()) + " after error: " +
-                                                rc.exception().getMessage());
-                                        return true;
-                                    }
-                                })
-                                        .retryMax(retries)
-                                        .exponentialBackoff(Duration.ofMillis(firstBackoff),
-                                                Duration.ofMillis(maxBackoff))
-                        )
+                .windowTimeout(maxRequestCount, Duration.ofMillis(maxRequestsWindowTime))
+                .onBackpressureBuffer()
+                .concatMap(a -> a.flatMap(v -> {
+                            long startTime = System.currentTimeMillis();
+                            return blobContainerAsyncClient.getBlobAsyncClient(calculateFilename(v.key()))
+                                    .upload(Flux.just(ByteBuffer.wrap((byte[]) v.value())), options)
+                                    .timeout(Mono.delay(Duration.ofMillis(timeout)))
+                                    .retryWhen(
+                                            // Usually because blob already exists so it doesn't retry
+                                            Retry.onlyIf(rc -> {
+                                                if (rc.exception().getMessage().contains("lob already exists")) {
+                                                    log.debug("Duplicated file, ignoring retry " +
+                                                            calculateFilename(v.key()));
+                                                    return false;
+                                                } else {
+                                                    log.warn("Retrying upload " + calculateFilename(v.key()) +
+                                                            " after error: " + rc.exception().getMessage());
+                                                    return true;
+                                                }
+                                            })
+                                                    .retryMax(retries)
+                                                    .exponentialBackoff(Duration.ofMillis(firstBackoff),
+                                                            Duration.ofMillis(maxBackoff))
+                                    )
+                                    .doOnError(e -> {
+                                        if (dlqTopic.isEmpty()) {
+                                            log.error("Unable to upload: " + calculateFilename(v.key()) +
+                                                    " with exception: " + e);
+                                        } else {
+                                            log.warn("Error uploading file: " + calculateFilename(v.key()) + " with exception: " +
+                                                    e);
+                                            if (!e.getMessage().contains("lob already exists")) {
+                                                try {
+                                                    kafkaTemplate.send(dlqTopic, v.key(), v.value());
+                                                } catch (Exception ex) {
+                                                    log.error("Unable to publish to the DLQ: " + calculateFilename(v.key()) +
+                                                            " with exception: " + ex);
+                                                }
+                                            }
+                                        }
+                                    })
+                                    .doOnSuccess((b) -> log.debug("Uploaded file " + calculateFilename(v.key()) +
+                                            " with ETag: " + b.getETag()))
+                                    .then(Mono.defer(() -> {
+                                        long diffInTime =
+                                                System.currentTimeMillis() - startTime;
 
-                        .doOnError(e -> {
-                            if (dlqTopic.isEmpty()) {
-                                log.error("Unable to upload: " + calculateFilename(v.key()) +
-                                        " with exception: " + e);
-                            } else {
-                                log.warn("Error uploading file: " + calculateFilename(v.key()) + " with exception: " +
-                                        e);
-                                if (!e.getMessage().contains("lob already exists")) {
-                                    try {
-                                        kafkaTemplate.send(dlqTopic, v.key(), v.value());
-                                    } catch (Exception ex) {
-                                        log.error("Unable to publish to the DLQ: " + calculateFilename(v.key()) +
-                                                " with exception: " + ex);
-                                    }
-                                }
-                            }
+                                        if (diffInTime < maxRequestsWindowTime) {
+                                            System.out.println("Test");
+                                            return Mono.delay(Duration.ofMillis(maxRequestsWindowTime - diffInTime))
+                                                    .then();
+                                        }
+
+                                        return Mono.empty();
+                                    }));
                         })
-                        // TODO: generate JMX metric
-                        .doOnSuccess((b) -> log.debug("Uploaded file " + calculateFilename(v.key()) +
-                                " with ETag: " + b.getETag()))
-                )
-                .doOnError(e -> {
-                    log.error("Unable to upload files to Azure: " + e);
-                })
-                .subscribe();
+                ).then()
+                .doOnError(e -> log.error("Unable to upload files to Azure: " + e)).subscribe();
     }
 
     String calculateFilename(Object filename) {
