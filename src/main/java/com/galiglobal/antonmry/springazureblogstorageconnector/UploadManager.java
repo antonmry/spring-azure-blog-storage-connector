@@ -5,6 +5,7 @@ import com.azure.storage.blob.BlobServiceAsyncClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.ParallelTransferOptions;
 import com.azure.storage.common.StorageSharedKeyCredential;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,8 +102,11 @@ public class UploadManager {
             groupId = "#{@uploadManagerConfiguration.getGroupId()}",
             containerFactory = "batchFactory")
     public void listen(ConsumerRecords<?, ?> records) {
+        process(Flux.fromIterable(records)).subscribe();
+    }
 
-        Flux.fromIterable(records)
+    public Mono<Void> process(Flux<ConsumerRecord<?, ?>> recordsFlux) {
+        return recordsFlux
                 .windowTimeout(maxRequestCount, Duration.ofMillis(maxRequestsWindowTime))
                 .onBackpressureBuffer()
                 .concatMap(a -> a.flatMap(v -> {
@@ -151,7 +155,6 @@ public class UploadManager {
                                                 System.currentTimeMillis() - startTime;
 
                                         if (diffInTime < maxRequestsWindowTime) {
-                                            System.out.println("Test");
                                             return Mono.delay(Duration.ofMillis(maxRequestsWindowTime - diffInTime))
                                                     .then();
                                         }
@@ -160,7 +163,7 @@ public class UploadManager {
                                     }));
                         })
                 ).then()
-                .doOnError(e -> log.error("Unable to upload files to Azure: " + e)).subscribe();
+                .doOnError(e -> log.error("Unable to upload files to Azure: " + e));
     }
 
     String calculateFilename(Object filename) {
