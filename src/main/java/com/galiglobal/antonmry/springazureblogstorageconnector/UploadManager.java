@@ -23,6 +23,7 @@ import reactor.retry.Retry;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.UUID;
 
 @Component
 // TODO: generate JMX metric
@@ -171,7 +172,6 @@ public class UploadManager {
         } else if (filename instanceof byte[]) {
             return new String((byte[]) filename);
         } else
-            // TODO: generate UUID?
-            return "random.txt";
+            return UUID.randomUUID().toString();
     }
 }
