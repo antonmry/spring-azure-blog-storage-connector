@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @RunWith(SpringRunner.class)
 @SpringBootTest
 @Slf4j
-public class KafkaTests {
+public class KafkaUploaderIT {
 
     private static final String TOPIC = "testEmbeddedOut";
     private static final String TOPIC2 = "testEmbeddedOut2";
