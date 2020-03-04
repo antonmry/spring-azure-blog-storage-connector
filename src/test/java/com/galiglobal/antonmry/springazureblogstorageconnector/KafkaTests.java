@@ -29,9 +29,6 @@ public class KafkaTests {
     public void testSendReceive() throws IOException, InterruptedException {
 
         try {
-/*
-            kafka.produce(TOPIC, null, "foo".getBytes());
-*/
             kafka.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
             kafka.produce(TOPIC, "foo.txt".getBytes(), "foo".getBytes());
             kafka.produce(TOPIC2, "foo2.txt".getBytes(), "foo2".getBytes());

@@ -26,9 +26,6 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Component
-// TODO: generate JMX metric
-// TODO: set dependencies
-//@ConditionalOnProperty(prefix = "connector.azure.blob.kafka", name = "groupId")
 @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class UploadManager {
 
